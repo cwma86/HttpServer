@@ -1,5 +1,4 @@
 use std::{
-    fs,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
     thread,
@@ -7,6 +6,7 @@ use std::{
 };
 
 use httpserver::ThreadPool;
+mod html;
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
@@ -38,7 +38,7 @@ fn handle_connection(mut stream: TcpStream) {
     };
 
 
-    let contents = fs::read_to_string(filename).unwrap();
+    let contents = html::gethtml(filename);
     let length = contents.len();
 
     let response =
