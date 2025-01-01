@@ -2,7 +2,7 @@
 Rust HTTP Server
 
 ## Description
-This is a simple rust project to learn the language through implementing a simple web server
+This is a simple rust project to learn the language through implementing a simple web server that leverages a threadpool architecture to enable processing requests from multiple users.
 
 ## Building
 To build the application navigate to the source code directory from the repo root `./httserver`
