@@ -2,6 +2,29 @@ use std::{
     sync::{mpsc, Arc, Mutex},
     thread,
 };
+use tracing::{span, Level};
+
+struct Worker {
+    id: usize,
+    thread: thread::JoinHandle<()>,
+}
+
+impl Worker {
+    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
+        let thread = thread::spawn(move || loop {
+            let job: Box<dyn FnOnce() + Send> = receiver.lock().unwrap().recv().unwrap();
+
+            let span = span!(Level::TRACE, "HTTP Request worker");
+            let _enter = span.enter();
+    
+            tracing::info!("Worker {id} got a job; executing.");
+
+            job();
+        });
+
+        Worker { id, thread }
+    }
+}
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
@@ -35,24 +58,5 @@ impl ThreadPool {
         let job = Box::new(f);
 
         self.sender.send(job).unwrap();
-    }
-}
-
-struct Worker {
-    id: usize,
-    thread: thread::JoinHandle<()>,
-}
-
-impl Worker {
-    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
-        let thread = thread::spawn(move || loop {
-            let job = receiver.lock().unwrap().recv().unwrap();
-
-            println!("Worker {id} got a job; executing.");
-
-            job();
-        });
-
-        Worker { id, thread }
     }
 }
