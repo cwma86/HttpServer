@@ -24,7 +24,7 @@ struct Args {
     /// Number of thread pools we wish to use for the deployment
     #[arg(long, default_value_t = 2)]
     threads: usize,
-    /// Log level (options: "INFO", "DEBUG", "TRACE")
+    /// Log level (options: "ERROR", "WARN", "INFO", "DEBUG", "TRACE")
     #[arg(long, default_value_t = String::from("INFO"))]
     log_level: String,
 }
