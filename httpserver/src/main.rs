@@ -1,14 +1,19 @@
-use clap::Parser;
+// Standard library includes
 use std::{
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
     str::FromStr,
     thread,
     time::Duration,
+    path,
 };
+
+// Third part crate dependencies
+use clap::Parser;
 use tracing::{event, span, Level};
 use tracing_subscriber::{filter, fmt};
 
+// Internal dependanices
 use httpserver::ThreadPool;
 mod html;
 
@@ -27,6 +32,9 @@ struct Args {
     /// Log level (options: "ERROR", "WARN", "INFO", "DEBUG", "TRACE")
     #[arg(long, default_value_t = String::from("INFO"))]
     log_level: String,
+    /// Path to the html directory of the hosted site
+    #[arg(long, default_value_t = String::from("./html"))]
+    html_path: String,
 }
 
 fn initialize_logger(level: String) {
@@ -72,6 +80,18 @@ fn main() {
     host_port.push_str(":");
     host_port.push_str(&args.port.to_string());
 
+    // validate paths to hosted html
+    let html_dir_path= path::Path::new(&args.html_path);
+    if !html_dir_path.is_dir(){
+        tracing::error!("Invalid path to the html directory from --html-path arguement: {}", args.html_path);
+        return;
+    }
+    let index_path = html_dir_path.join("index.html");
+    if !index_path.is_file(){
+        tracing::error!("Invalid path to the html directory from --html-path arguement: {}", args.html_path);
+        return;
+    }
+
     // Bind our port
     tracing::info!("hosting website on http://{}", host_port);
     let listener = TcpListener::bind(host_port).unwrap();
@@ -97,6 +117,7 @@ fn main() {
 }
 
 fn handle_connection(mut stream: TcpStream) {
+    let args = Args::parse();
     let buf_reader: BufReader<&TcpStream> = BufReader::new(&stream);
     let request_line = buf_reader.lines().next();
     if request_line.is_none() {
@@ -105,29 +126,39 @@ fn handle_connection(mut stream: TcpStream) {
     }
     let request_line = request_line.unwrap().unwrap();
 
-    let (status_line, filename) = match &request_line[..] {
+    let html_dir_path: &path::Path= path::Path::new(&args.html_path);
+    if !html_dir_path.is_dir(){
+        tracing::error!("Invalid path to the html directory from --html-path arguement: {}", args.html_path);
+        return;
+    }
+
+    let (status_line, directory_path, filename) = match &request_line[..] {
         "GET / HTTP/1.1" => (
             "HTTP/1.1 200 OK",
-            "/home/corym/proj/HttpServer/httpserver/html/index.html",
+            html_dir_path,
+            String::from("index.html"),
         ),
         "GET /features HTTP/1.1" => (
             "HTTP/1.1 200 OK",
-            "/home/corym/proj/HttpServer/httpserver/html/features.html",
+            html_dir_path,
+            String::from("features.html"),
         ),
         "GET /sleep HTTP/1.1" => {
             thread::sleep(Duration::from_secs(5));
             (
                 "HTTP/1.1 200 OK",
-                "/home/corym/proj/HttpServer/httpserver/html/index.html",
-            )
+                html_dir_path,
+                String::from("index.html"),
+                )
         }
         _ => (
             "HTTP/1.1 404 NOT FOUND",
-            "/home/corym/proj/HttpServer/httpserver/html/404.html",
+            html_dir_path,
+            String::from("404.html"),
         ),
     };
 
-    let contents = html::gethtml(filename);
+    let contents = html::gethtml(directory_path, &filename);
     let length = contents.len();
 
     let response = format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}");
